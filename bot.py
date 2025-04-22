@@ -1,3 +1,7 @@
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from parser import parse_kaspi_product
@@ -7,13 +11,13 @@ from config import BOT_TOKEN
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Отправь мне ссылку на товар Kaspi, и я покажу примерные продажи и спрос 📊")
 
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
     if "kaspi.kz" not in url:
         await update.message.reply_text("Пожалуйста, отправь корректную ссылку на товар Kaspi.kz.")
         return
 
-    # Парсим данные товара с анализом
     data = parse_kaspi_product(url)
 
     if not data:
@@ -25,7 +29,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Не удалось оценить продажи 😢")
         return
 
-    # Сборка ответа
     response = (
         f"📦 *{data.get('title', 'Название товара не найдено')}*\n"
         f"🔢 ID товара: {data.get('product_id', 'неизвестно')}\n"
@@ -35,7 +38,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Рейтинг по звёздам:\n"
     )
 
-    # Рейтинг по звёздам
     for rate in sorted(data.get('ratings', {}).keys(), reverse=True):
         response += f"  {rate}★ — {data['ratings'].get(rate)} шт.\n"
 
@@ -71,10 +73,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(response, parse_mode="Markdown")
 
-# Запуск бота
+
+# ➤ Фейковый веб-сервер для Render (обязательный хак)
+class HelloHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Kaspi Parser Bot is running!')
+
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))  # Render ожидает переменную PORT
+    server = HTTPServer(("", port), HelloHandler)
+    server.serve_forever()
+
+
+# Запускаем веб-сервер в отдельном потоке
+threading.Thread(target=run_web_server, daemon=True).start()
+
+# ➤ Запуск Telegram-бота
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 print("Бот запущен ✅")
 app.run_polling()
-
