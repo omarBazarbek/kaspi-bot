@@ -10,7 +10,6 @@ from config import BOT_TOKEN, WEBHOOK_URL
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Отправь мне ссылку на товар Kaspi, и я покажу примерные продажи и спрос 📊")
 
-
 # Обработчик сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
